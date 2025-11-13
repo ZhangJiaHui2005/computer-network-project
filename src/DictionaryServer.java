@@ -1,8 +1,6 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 public class DictionaryServer {
@@ -13,40 +11,82 @@ public class DictionaryServer {
         try(
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-                ) {
+        ) {
+            // Đọc chế độ từ client: "EN2V" hoặc "V2E"
+            String modeLine = in.readLine();
+            boolean viToEn = modeLine != null && (modeLine.equalsIgnoreCase("V2E") || modeLine.equalsIgnoreCase("VI2EN") || modeLine.equalsIgnoreCase("vi->en"));
+            out.println("Chế độ: " + (viToEn ? "Tiếng Việt -> Tiếng Anh" : "Tiếng Anh -> Tiếng Việt"));
+
             String word;
 
             while((word = in.readLine()) != null) {
-                word = word.trim().toLowerCase();
-                System.out.println("Tra tu: " + word);
+                word = word.trim();
+                System.out.println("Tra tu: " + word + " (mode: " + (viToEn ? "V->E" : "E->V") + ")");
 
-                if(word.equals("exit")) {
+                if(word.equalsIgnoreCase("exit")) {
                     out.println("Ket thuc phien lam viec!!!");
                     break;
                 }
 
-                String meaning = dictionary.getProperty(word);
-
-                if(meaning != null) {
-                    out.println("Nghia cua tu " + word + ":" + meaning);
-                } else {
-                    out.println("Khong tim thay tu " + word + " ban co muon them tu nay khong? (y/N): ");
-                    String answer = in.readLine();
-
-                    if (answer != null && answer.equalsIgnoreCase("y")) {
-                        out.println("Nhap nghia tieng viet cho tu " + word + ": ");
-                        String newMeaning = in.readLine();
-
-                        if (newMeaning != null && !newMeaning.isBlank()) {
-                            dictionary.setProperty(word, newMeaning.trim());
-                            saveDictionary();
-
-                            out.println("✅ Đã thêm \"" + word + "\" = \"" + newMeaning + "\" vào từ điển!");
-                        } else {
-                            out.println("Khong the them tu do nghia trong");
+                if (viToEn) {
+                    // Tìm key (tiếng Anh) theo value (tiếng Việt)
+                    String foundEnglish = null;
+                    for (String eng : dictionary.stringPropertyNames()) {
+                        String viet = dictionary.getProperty(eng);
+                        if (viet != null && viet.trim().equalsIgnoreCase(word.trim())) {
+                            foundEnglish = eng;
+                            break;
                         }
+                    }
+
+                    if (foundEnglish != null) {
+                        out.println("Nghia tieng Anh cua \"" + word + "\": " + foundEnglish);
                     } else {
-                        out.println("Bo qua viec them tu");
+                        out.println("Khong tim thay tu " + word + " ban co muon them tu nay khong? (y/N): ");
+                        String answer = in.readLine();
+
+                        if (answer != null && answer.equalsIgnoreCase("y")) {
+                            out.println("Nhap tu tieng anh cho tu " + word + ": ");
+                            String newEnglish = in.readLine();
+
+                            if (newEnglish != null && !newEnglish.isBlank()) {
+                                dictionary.setProperty(newEnglish.trim().toLowerCase(), word.trim());
+                                saveDictionary();
+
+                                out.println("✅ Đã thêm \"" + word + "\" = \"" + newEnglish + "\" vào từ điển!");
+                            } else {
+                                out.println("Khong the them tu do nghia trong");
+                            }
+                        } else {
+                            out.println("Bo qua viec them tu");
+                        }
+                    }
+                } else {
+                    // EN -> VI (hành vi trước đó)
+                    String key = word.toLowerCase();
+                    String meaning = dictionary.getProperty(key);
+
+                    if(meaning != null) {
+                        out.println("Nghia cua tu " + word + ": " + meaning);
+                    } else {
+                        out.println("Khong tim thay tu " + word + " ban co muon them tu nay khong? (y/N): ");
+                        String answer = in.readLine();
+
+                        if (answer != null && answer.equalsIgnoreCase("y")) {
+                            out.println("Nhap nghia tieng viet cho tu " + word + ": ");
+                            String newMeaning = in.readLine();
+
+                            if (newMeaning != null && !newMeaning.isBlank()) {
+                                dictionary.setProperty(key, newMeaning.trim());
+                                saveDictionary();
+
+                                out.println("✅ Đã thêm \"" + word + "\" = \"" + newMeaning + "\" vào từ điển!");
+                            } else {
+                                out.println("Khong the them tu do nghia trong");
+                            }
+                        } else {
+                            out.println("Bo qua viec them tu");
+                        }
                     }
                 }
             }
